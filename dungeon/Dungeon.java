@@ -75,6 +75,32 @@ public final class Dungeon {
         return y >= 0 && y < floor.length && x >= 0 && x < floor[0].length && floor[y][x];
     }
 
+    /** Picks a random floor tile away from spawn for the exit portal. */
+    public static int[] pickExitTile(Dungeon dungeon, Random rng, int spawnX, int spawnY) {
+        int w = dungeon.floor[0].length;
+        int h = dungeon.floor.length;
+        for (int attempt = 0; attempt < 5000; attempt++) {
+            int x = rng.nextInt(w);
+            int y = rng.nextInt(h);
+            if (!dungeon.walkable(x, y) || (x == spawnX && y == spawnY)) {
+                continue;
+            }
+            int dx = x - spawnX;
+            int dy = y - spawnY;
+            if (dx * dx + dy * dy >= 64) {
+                return new int[] {x, y};
+            }
+        }
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                if (dungeon.walkable(x, y) && !(x == spawnX && y == spawnY)) {
+                    return new int[] {x, y};
+                }
+            }
+        }
+        return new int[] {spawnX, spawnY};
+    }
+
     private static int minSizeToSplit() {
         return Math.max(MIN_PARTITION_SIZE, SPLIT_PADDING * 2 + 1);
     }
