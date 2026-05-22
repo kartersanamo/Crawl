@@ -128,11 +128,15 @@ public final class Game extends JPanel {
     }
 
     private void fireBowAtMouse() {
+        if (!player.canAttack()) {
+            return;
+        }
         double camX = player.getX() * TILE - getWidth() / 2.0;
         double camY = player.getY() * TILE - getHeight() / 2.0;
         double targetX = (mouseScreenX + camX) / TILE;
         double targetY = (mouseScreenY + camY) / TILE;
         player.fireRanged(enemies, arrows, targetX, targetY);
+        player.triggerAttackCooldown();
     }
 
     private void tick() {
@@ -186,6 +190,9 @@ public final class Game extends JPanel {
     }
 
     private void playerMeleeAttack() {
+        if (!player.canAttack()) {
+            return;
+        }
         int damage = player.getWeapon().getMeleeDamage();
         for (Enemy enemy : enemies) {
             if (!enemy.isAlive()) {
@@ -199,6 +206,7 @@ public final class Game extends JPanel {
                 }
             }
         }
+        player.triggerAttackCooldown();
     }
 
     private void onEnemyHit(Enemy enemy, int damageDealt) {
@@ -312,7 +320,7 @@ public final class Game extends JPanel {
         if (resetGear) {
             player.resetOnDeath();
         } else {
-            player.revive();
+            player.enterNextFloor();
         }
         arrows.clear();
         Random rng = new Random(roundSeed ^ 0x5DEECE66DL);

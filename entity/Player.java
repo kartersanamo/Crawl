@@ -18,12 +18,14 @@ public final class Player {
     public static final int MAX_ARMOR = 100;
     public static final double ATTACK_RANGE = 1.1;
     public static final double INVULN_SECONDS = 0.6;
+    public static final double ATTACK_COOLDOWN = 1.0;
 
     private double x;
     private double y;
     private int health = MAX_HEALTH;
     private int armor;
     private double invulnTimer;
+    private double attackCooldown;
     private double speedMultiplier = 1.0;
     private double potionTimer;
     private Weapon weapon = new Fists();
@@ -54,13 +56,19 @@ public final class Player {
         potionTimer = 0;
     }
 
-    /** New floor: restore HP and clear armor/potions, keep equipped weapon. */
-    public void revive() {
-        health = MAX_HEALTH;
-        armor = 0;
+    /** New floor: keep weapon, HP, and armor; only clear potion buffs. */
+    public void enterNextFloor() {
         invulnTimer = 0;
         speedMultiplier = 1.0;
         potionTimer = 0;
+    }
+
+    public boolean canAttack() {
+        return attackCooldown <= 0;
+    }
+
+    public void triggerAttackCooldown() {
+        attackCooldown = ATTACK_COOLDOWN;
     }
 
     /** Death restart: back to fists, no armor, no active effects. */
@@ -68,6 +76,7 @@ public final class Player {
         health = MAX_HEALTH;
         armor = 0;
         invulnTimer = 0;
+        attackCooldown = 0;
         speedMultiplier = 1.0;
         potionTimer = 0;
         weapon = new Fists();
@@ -144,6 +153,9 @@ public final class Player {
     public void tickTimers(double dt) {
         if (invulnTimer > 0) {
             invulnTimer = Math.max(0, invulnTimer - dt);
+        }
+        if (attackCooldown > 0) {
+            attackCooldown = Math.max(0, attackCooldown - dt);
         }
         if (potionTimer > 0) {
             potionTimer = Math.max(0, potionTimer - dt);
