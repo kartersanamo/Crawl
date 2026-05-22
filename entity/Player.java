@@ -1,10 +1,13 @@
 package entity;
 
 import dungeon.Dungeon;
+import item.Fists;
+import item.Weapon;
 
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.event.KeyEvent;
+import java.util.List;
 
 public final class Player {
     public static final double MOVE_SPEED = 10.0;
@@ -12,13 +15,18 @@ public final class Player {
     public static final int SIZE = 16;
     public static final Color COLOR = new Color(240, 210, 90);
     public static final int MAX_HEALTH = 100;
+    public static final int MAX_ARMOR = 100;
     public static final double ATTACK_RANGE = 1.1;
     public static final double INVULN_SECONDS = 0.6;
 
     private double x;
     private double y;
     private int health = MAX_HEALTH;
+    private int armor;
     private double invulnTimer;
+    private double speedMultiplier = 1.0;
+    private double potionTimer;
+    private Weapon weapon = new Fists();
     private boolean up;
     private boolean down;
     private boolean left;
@@ -38,17 +46,50 @@ public final class Player {
         y = tileY + 0.5;
     }
 
-    public void resetHealth() {
+    public void resetForRound() {
         health = MAX_HEALTH;
+        armor = 0;
         invulnTimer = 0;
+        speedMultiplier = 1.0;
+        potionTimer = 0;
+        weapon = new Fists();
     }
 
     public int getHealth() {
         return health;
     }
 
+    public int getArmor() {
+        return armor;
+    }
+
     public int getMaxHealth() {
         return MAX_HEALTH;
+    }
+
+    public int getMaxArmor() {
+        return MAX_ARMOR;
+    }
+
+    public Weapon getWeapon() {
+        return weapon;
+    }
+
+    public void equipWeapon(Weapon newWeapon) {
+        weapon = newWeapon;
+    }
+
+    public void addArmor(int amount) {
+        armor = Math.min(MAX_ARMOR, armor + amount);
+    }
+
+    public void healToFull() {
+        health = MAX_HEALTH;
+    }
+
+    public void applySpeedBoost(double multiplier, double durationSeconds) {
+        speedMultiplier = multiplier;
+        potionTimer = durationSeconds;
     }
 
     public boolean isAlive() {
@@ -59,29 +100,54 @@ public final class Player {
         if (invulnTimer > 0 || !isAlive()) {
             return;
         }
-        health = Math.max(0, health - amount);
+
+        int remaining = amount;
+        if (armor > 0) {
+            int absorbed = Math.min(armor, remaining);
+            armor -= absorbed;
+            remaining -= absorbed;
+        }
+        if (remaining > 0) {
+            health = Math.max(0, health - remaining);
+        }
         invulnTimer = INVULN_SECONDS;
     }
 
-    public void tickInvuln(double dt) {
+    public void tickTimers(double dt) {
         if (invulnTimer > 0) {
             invulnTimer = Math.max(0, invulnTimer - dt);
         }
-    }
-
-    public boolean tryAttack(java.util.List<Enemy> enemies) {
-        boolean hit = false;
-        for (Enemy enemy : enemies) {
-            if (!enemy.isAlive()) {
-                continue;
-            }
-            double dist = Math.hypot(enemy.getX() - x, enemy.getY() - y);
-            if (dist <= ATTACK_RANGE + Enemy.RADIUS) {
-                enemy.takeDamage(1);
-                hit = true;
+        if (potionTimer > 0) {
+            potionTimer = Math.max(0, potionTimer - dt);
+            if (potionTimer == 0) {
+                speedMultiplier = 1.0;
             }
         }
-        return hit;
+    }
+
+    public boolean tryMeleeAttack(List<Enemy> enemies) {
+        if (weapon.isRanged()) {
+            return false;
+        }
+        int before = livingCount(enemies);
+        weapon.meleeAttack(this, enemies);
+        return livingCount(enemies) != before || !weapon.isRanged();
+    }
+
+    public void fireRanged(List<Enemy> enemies, List<Arrow> arrows, double targetWorldX, double targetWorldY) {
+        if (weapon.isRanged()) {
+            weapon.rangedAttack(this, enemies, arrows, targetWorldX, targetWorldY);
+        }
+    }
+
+    private int livingCount(List<Enemy> enemies) {
+        int count = 0;
+        for (Enemy enemy : enemies) {
+            if (enemy.isAlive()) {
+                count++;
+            }
+        }
+        return count;
     }
 
     public double getX() {
@@ -115,7 +181,6 @@ public final class Player {
         }
     }
 
-    /** @return true if the player moved this tick */
     public boolean update(double dt, Dungeon dungeon) {
         double dx = 0;
         double dy = 0;
@@ -135,9 +200,10 @@ public final class Player {
             return false;
         }
 
+        double speed = MOVE_SPEED * speedMultiplier;
         double len = Math.hypot(dx, dy);
-        dx = dx / len * MOVE_SPEED * dt;
-        dy = dy / len * MOVE_SPEED * dt;
+        dx = dx / len * speed * dt;
+        dy = dy / len * speed * dt;
         return move(dx, dy, dungeon);
     }
 
@@ -186,5 +252,17 @@ public final class Player {
         g.drawRect(x, y, width, height);
         g.setFont(new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 11));
         g.drawString(health + " / " + MAX_HEALTH, x + 6, y + height - 5);
+    }
+
+    public void drawArmorBar(Graphics g, int x, int y, int width, int height) {
+        g.setColor(new Color(40, 40, 40));
+        g.fillRect(x, y, width, height);
+        int fill = (int) (width * (armor / (double) MAX_ARMOR));
+        g.setColor(new Color(100, 140, 220));
+        g.fillRect(x, y, fill, height);
+        g.setColor(Color.WHITE);
+        g.drawRect(x, y, width, height);
+        g.setFont(new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 11));
+        g.drawString(armor + " / " + MAX_ARMOR, x + 6, y + height - 5);
     }
 }

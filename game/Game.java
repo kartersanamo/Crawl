@@ -1,9 +1,12 @@
 package game;
 
 import dungeon.Dungeon;
+import entity.Arrow;
 import entity.Enemy;
 import entity.EnemySpawner;
 import entity.Player;
+import item.ItemSpawner;
+import item.MapPickup;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -22,14 +25,15 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
 public final class Game extends JPanel {
     private static final int TILE = 16;
     private static final int MAP_GROWTH_PER_ROUND = 8;
-    private static final int HEALTH_BAR_W = 160;
-    private static final int HEALTH_BAR_H = 18;
+    private static final int BAR_W = 160;
+    private static final int BAR_H = 16;
 
     private static final Color FLOOR = new Color(58, 58, 72);
     private static final Color WALL = new Color(30, 30, 38);
@@ -44,9 +48,13 @@ public final class Game extends JPanel {
     private int round = 1;
     private Dungeon dungeon;
     private List<Enemy> enemies = new ArrayList<>();
+    private List<MapPickup> pickups = new ArrayList<>();
+    private List<Arrow> arrows = new ArrayList<>();
     private int exitX, exitY;
     private boolean showOverlay;
     private String overlayMessage = "";
+    private int mouseScreenX;
+    private int mouseScreenY;
 
     public Game(long seed) {
         this.baseSeed = seed;
@@ -59,9 +67,8 @@ public final class Game extends JPanel {
         addKeyListener(new KeyAdapter() {
             public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_SPACE) {
-                    if (player.tryAttack(enemies)) {
-                        repaint();
-                    }
+                    player.tryMeleeAttack(enemies);
+                    repaint();
                     return;
                 }
                 player.setKey(e.getKeyCode(), true);
@@ -75,17 +82,48 @@ public final class Game extends JPanel {
         addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                if (e.getButton() == MouseEvent.BUTTON1 && showOverlay) {
-                    round++;
-                    loadRound();
-                    repaint();
+                mouseScreenX = e.getX();
+                mouseScreenY = e.getY();
+                if (e.getButton() == MouseEvent.BUTTON1) {
+                    if (showOverlay) {
+                        round++;
+                        loadRound();
+                        repaint();
+                        return;
+                    }
+                    if (player.getWeapon().isRanged()) {
+                        fireBowAtMouse();
+                        repaint();
+                    }
                 }
+            }
+
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                mouseScreenX = e.getX();
+                mouseScreenY = e.getY();
+            }
+        });
+
+        addMouseMotionListener(new MouseAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                mouseScreenX = e.getX();
+                mouseScreenY = e.getY();
             }
         });
 
         lastTickNanos = System.nanoTime();
         timer = new Timer(16, e -> tick());
         timer.start();
+    }
+
+    private void fireBowAtMouse() {
+        double camX = player.getX() * TILE - getWidth() / 2.0;
+        double camY = player.getY() * TILE - getHeight() / 2.0;
+        double targetX = (mouseScreenX + camX) / TILE;
+        double targetY = (mouseScreenY + camY) / TILE;
+        player.fireRanged(enemies, arrows, targetX, targetY);
     }
 
     private void tick() {
@@ -97,7 +135,7 @@ public final class Game extends JPanel {
         double dt = Math.min((now - lastTickNanos) / 1_000_000_000.0, 0.05);
         lastTickNanos = now;
 
-        player.tickInvuln(dt);
+        player.tickTimers(dt);
         player.update(dt, dungeon);
 
         for (Enemy enemy : enemies) {
@@ -107,8 +145,29 @@ public final class Game extends JPanel {
             }
         }
 
+        Iterator<Arrow> arrowIt = arrows.iterator();
+        while (arrowIt.hasNext()) {
+            Arrow arrow = arrowIt.next();
+            arrow.update(dt, dungeon, enemies);
+            if (!arrow.isActive()) {
+                arrowIt.remove();
+            }
+        }
+
+        collectPickups();
         updateExitState();
         repaint();
+    }
+
+    private void collectPickups() {
+        Iterator<MapPickup> it = pickups.iterator();
+        while (it.hasNext()) {
+            MapPickup pickup = it.next();
+            if (pickup.touches(player)) {
+                pickup.collect(player);
+                it.remove();
+            }
+        }
     }
 
     private boolean allEnemiesDead() {
@@ -144,16 +203,13 @@ public final class Game extends JPanel {
             if (!showOverlay) {
                 showOverlay = true;
                 overlayMessage = "Stairs to the next floor.\nLeft-click to descend.";
-                repaint();
             }
         } else {
             if (showOverlay) {
                 showOverlay = false;
                 overlayMessage = "";
-                repaint();
             } else if (onExit && !cleared) {
                 overlayMessage = "Defeat all enemies first! (" + livingEnemyCount() + " left)";
-                repaint();
             } else if (!onExit && !overlayMessage.isEmpty() && !showOverlay) {
                 overlayMessage = "";
             }
@@ -166,12 +222,14 @@ public final class Game extends JPanel {
         long roundSeed = baseSeed + (long) round * 9973L;
         dungeon = Dungeon.generate(roundSeed, w, h);
         player.spawnAt(dungeon.spawnX, dungeon.spawnY);
-        player.resetHealth();
+        player.resetForRound();
+        arrows.clear();
         Random rng = new Random(roundSeed ^ 0x5DEECE66DL);
         int[] exit = Dungeon.pickExitTile(dungeon, rng, dungeon.spawnX, dungeon.spawnY);
         exitX = exit[0];
         exitY = exit[1];
         enemies = EnemySpawner.spawn(dungeon, rng, round, dungeon.spawnX, dungeon.spawnY, exitX, exitY);
+        pickups = ItemSpawner.spawn(dungeon, rng, dungeon.spawnX, dungeon.spawnY, exitX, exitY);
         showOverlay = false;
         overlayMessage = "";
     }
@@ -217,8 +275,16 @@ public final class Game extends JPanel {
             }
         }
 
+        for (MapPickup pickup : pickups) {
+            pickup.draw(g, camX, camY, TILE);
+        }
+
         for (Enemy enemy : enemies) {
             enemy.draw(g, camX, camY, TILE);
+        }
+
+        for (Arrow arrow : arrows) {
+            arrow.draw(g, camX, camY, TILE);
         }
 
         if (player.isAlive()) {
@@ -228,12 +294,19 @@ public final class Game extends JPanel {
         g.setColor(Color.WHITE);
         g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 16));
         g.drawString("Round " + round, 10, 22);
-        player.drawHealthBar(g, 10, 30, HEALTH_BAR_W, HEALTH_BAR_H);
+        player.drawHealthBar(g, 10, 28, BAR_W, BAR_H);
+        player.drawArmorBar(g, 10, 48, BAR_W, BAR_H);
         g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
-        g.drawString("Enemies: " + livingEnemyCount(), 10, 62);
+        g.drawString("Enemies: " + livingEnemyCount(), 10, 78);
+        g.drawString("Weapon: " + player.getWeapon().getName(), 10, 94);
+        if (player.getWeapon().isRanged()) {
+            g.drawString("Left-click to shoot", 10, 110);
+        } else {
+            g.drawString("Space to attack", 10, 110);
+        }
 
         if (!player.isAlive()) {
-            drawCenterMessage(g, "You died. Restart to try again.");
+            drawCenterMessage(g, "You died. Close and restart to try again.");
         } else if (!overlayMessage.isEmpty() && !showOverlay) {
             drawHint(g, overlayMessage);
         }
