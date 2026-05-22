@@ -5,9 +5,9 @@ import java.util.Random;
 public final class Dungeon {
     // Default map width in tiles. Higher = larger dungeon (more space for rooms).
     // 100×70 feels like a classic floor: big enough to explore, not an empty wasteland.
-    public static final int DEFAULT_WIDTH = 100;
+    public static final int DEFAULT_WIDTH = 30;
     // Default map height in tiles. Higher = larger dungeon (more space for rooms).
-    public static final int DEFAULT_HEIGHT = 70;
+    public static final int DEFAULT_HEIGHT = 30;
 
     // Wall thickness around the map edge in tiles. Higher = thicker outer wall border.
     public static final int MAP_BORDER = 1;
