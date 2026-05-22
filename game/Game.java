@@ -85,6 +85,10 @@ public final class Game extends JPanel {
                 mouseScreenX = e.getX();
                 mouseScreenY = e.getY();
                 if (e.getButton() == MouseEvent.BUTTON1) {
+                    if (!player.isAlive()) {
+                        restartRun();
+                        return;
+                    }
                     if (showOverlay) {
                         round++;
                         loadRound();
@@ -216,13 +220,19 @@ public final class Game extends JPanel {
         }
     }
 
+    private void restartRun() {
+        round = 1;
+        loadRound();
+        repaint();
+    }
+
     private void loadRound() {
         int w = Dungeon.DEFAULT_WIDTH + (round - 1) * MAP_GROWTH_PER_ROUND;
         int h = Dungeon.DEFAULT_HEIGHT + (round - 1) * MAP_GROWTH_PER_ROUND;
         long roundSeed = baseSeed + (long) round * 9973L;
         dungeon = Dungeon.generate(roundSeed, w, h);
         player.spawnAt(dungeon.spawnX, dungeon.spawnY);
-        player.resetForRound();
+        player.revive();
         arrows.clear();
         Random rng = new Random(roundSeed ^ 0x5DEECE66DL);
         int[] exit = Dungeon.pickExitTile(dungeon, rng, dungeon.spawnX, dungeon.spawnY);
@@ -306,7 +316,7 @@ public final class Game extends JPanel {
         }
 
         if (!player.isAlive()) {
-            drawCenterMessage(g, "You died. Close and restart to try again.");
+            drawOverlay(g, "You died.\nLeft-click to restart.");
         } else if (!overlayMessage.isEmpty() && !showOverlay) {
             drawHint(g, overlayMessage);
         }

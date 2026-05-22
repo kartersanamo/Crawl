@@ -52,7 +52,14 @@ public final class Player {
         invulnTimer = 0;
         speedMultiplier = 1.0;
         potionTimer = 0;
-        weapon = new Fists();
+    }
+
+    public void revive() {
+        health = MAX_HEALTH;
+        armor = 0;
+        invulnTimer = 0;
+        speedMultiplier = 1.0;
+        potionTimer = 0;
     }
 
     public int getHealth() {
