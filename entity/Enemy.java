@@ -10,11 +10,13 @@ public abstract class Enemy {
 
     protected double x;
     protected double y;
+    protected final int maxHp;
     protected int hp;
 
     protected Enemy(double x, double y, int hp) {
         this.x = x;
         this.y = y;
+        this.maxHp = hp;
         this.hp = hp;
     }
 
@@ -36,12 +38,19 @@ public abstract class Enemy {
         return hp;
     }
 
+    public int getMaxHp() {
+        return maxHp;
+    }
+
     public boolean isAlive() {
         return hp > 0;
     }
 
-    public void takeDamage(int amount) {
+    /** @return damage actually dealt (capped at current HP) */
+    public int takeDamage(int amount) {
+        int dealt = Math.min(amount, Math.max(0, hp));
         hp -= amount;
+        return dealt;
     }
 
     public boolean touches(Player player) {
@@ -97,6 +106,17 @@ public abstract class Enemy {
         }
         int screenX = (int) Math.round(x * tileSize - camX) - getSize() / 2;
         int screenY = (int) Math.round(y * tileSize - camY) - getSize() / 2;
+
+        int barW = getSize() + 4;
+        int barH = 3;
+        int barX = screenX - 2;
+        int barY = screenY - 5;
+        g.setColor(new Color(30, 30, 30));
+        g.fillRect(barX, barY, barW, barH);
+        int fill = (int) (barW * (hp / (double) maxHp));
+        g.setColor(new Color(200, 40, 40));
+        g.fillRect(barX, barY, Math.max(0, fill), barH);
+
         g.setColor(getColor());
         g.fillRect(screenX, screenY, getSize(), getSize());
     }

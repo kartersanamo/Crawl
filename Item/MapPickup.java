@@ -52,6 +52,10 @@ public final class MapPickup {
         return y;
     }
 
+    public Kind getKind() {
+        return kind;
+    }
+
     public String getLabel() {
         return switch (kind) {
             case ARMOR -> armor.getName();

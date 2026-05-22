@@ -56,6 +56,11 @@ public final class Game extends JPanel {
     private int mouseScreenX;
     private int mouseScreenY;
 
+    private int kills;
+    private int score;
+    private boolean floorClearBonusGiven;
+    private final List<DamageNumber> damageNumbers = new ArrayList<>();
+
     public Game(long seed) {
         this.baseSeed = seed;
         setPreferredSize(new Dimension(800, 600));
@@ -70,7 +75,7 @@ public final class Game extends JPanel {
                     if (player.getWeapon().isRanged()) {
                         fireBowAtMouse();
                     } else {
-                        player.tryMeleeAttack(enemies);
+                        playerMeleeAttack();
                     }
                     repaint();
                     return;
@@ -94,6 +99,7 @@ public final class Game extends JPanel {
                         return;
                     }
                     if (showOverlay) {
+                        addScore(40 * round);
                         round++;
                         loadRound(false);
                         repaint();
@@ -144,22 +150,82 @@ public final class Game extends JPanel {
         for (Enemy enemy : enemies) {
             enemy.update(dt, dungeon, player);
             if (enemy.isAlive() && enemy.touches(player)) {
-                player.takeDamage(enemy.getTouchDamage());
+                int taken = player.takeDamage(enemy.getTouchDamage());
+                if (taken > 0) {
+                    onPlayerDamaged(taken);
+                }
             }
         }
 
         Iterator<Arrow> arrowIt = arrows.iterator();
         while (arrowIt.hasNext()) {
             Arrow arrow = arrowIt.next();
-            arrow.update(dt, dungeon, enemies);
+            Arrow.HitResult hit = arrow.update(dt, dungeon, enemies);
+            if (hit != null) {
+                onEnemyHit(hit.enemy, hit.damage);
+            }
             if (!arrow.isActive()) {
                 arrowIt.remove();
             }
         }
 
+        Iterator<DamageNumber> numIt = damageNumbers.iterator();
+        while (numIt.hasNext()) {
+            if (!numIt.next().update(dt)) {
+                numIt.remove();
+            }
+        }
+
         collectPickups();
+        if (allEnemiesDead() && !floorClearBonusGiven) {
+            floorClearBonusGiven = true;
+            addScore(75 * round);
+        }
         updateExitState();
         repaint();
+    }
+
+    private void playerMeleeAttack() {
+        int damage = player.getWeapon().getMeleeDamage();
+        for (Enemy enemy : enemies) {
+            if (!enemy.isAlive()) {
+                continue;
+            }
+            double dist = Math.hypot(enemy.getX() - player.getX(), enemy.getY() - player.getY());
+            if (dist <= Player.ATTACK_RANGE + Enemy.RADIUS) {
+                int dealt = enemy.takeDamage(damage);
+                if (dealt > 0) {
+                    onEnemyHit(enemy, dealt);
+                }
+            }
+        }
+    }
+
+    private void onEnemyHit(Enemy enemy, int damageDealt) {
+        addScore(damageDealt * 2);
+        damageNumbers.add(new DamageNumber(enemy.getX(), enemy.getY(), damageDealt, false));
+        if (!enemy.isAlive()) {
+            onEnemyKilled(enemy);
+        }
+    }
+
+    private void onEnemyKilled(Enemy enemy) {
+        kills++;
+        int bonus = switch (enemy.getName()) {
+            case "Goblin" -> 35;
+            case "Rat" -> 20;
+            default -> 15;
+        };
+        addScore(bonus);
+    }
+
+    private void onPlayerDamaged(int damageTaken) {
+        addScore(1);
+        damageNumbers.add(new DamageNumber(player.getX(), player.getY(), damageTaken, true));
+    }
+
+    private void addScore(int points) {
+        score += points;
     }
 
     private void collectPickups() {
@@ -167,6 +233,7 @@ public final class Game extends JPanel {
         while (it.hasNext()) {
             MapPickup pickup = it.next();
             if (pickup.touches(player)) {
+                addScore(pickupScore(pickup));
                 pickup.collect(player);
                 it.remove();
             }
@@ -221,8 +288,19 @@ public final class Game extends JPanel {
 
     private void restartRun() {
         round = 1;
+        kills = 0;
+        score = 0;
         loadRound(true);
         repaint();
+    }
+
+    private int pickupScore(MapPickup pickup) {
+        return switch (pickup.getKind()) {
+            case WEAPON -> 60;
+            case ARMOR -> 30;
+            case FOOD -> 25;
+            case POTION -> 35;
+        };
     }
 
     private void loadRound(boolean resetGear) {
@@ -243,6 +321,8 @@ public final class Game extends JPanel {
         exitY = exit[1];
         enemies = EnemySpawner.spawn(dungeon, rng, round, dungeon.spawnX, dungeon.spawnY, exitX, exitY);
         pickups = ItemSpawner.spawn(dungeon, rng, dungeon.spawnX, dungeon.spawnY, exitX, exitY);
+        floorClearBonusGiven = false;
+        damageNumbers.clear();
         showOverlay = false;
         overlayMessage = "";
     }
@@ -304,18 +384,11 @@ public final class Game extends JPanel {
             player.drawCentered(g, getWidth(), getHeight());
         }
 
-        g.setColor(Color.WHITE);
-        g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 16));
-        g.drawString("Round " + round, 10, 22);
-        player.drawHealthBar(g, 10, 28, BAR_W, BAR_H);
-        player.drawArmorBar(g, 10, 48, BAR_W, BAR_H);
-        g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
-        g.drawString("Enemies: " + livingEnemyCount(), 10, 78);
-        g.drawString("Weapon: " + player.getWeapon().getName(), 10, 94);
-        g.drawString("Space to attack", 10, 110);
-        if (player.getWeapon().isRanged()) {
-            g.drawString("Aim with mouse", 10, 126);
+        for (DamageNumber number : damageNumbers) {
+            number.draw(g, camX, camY, TILE);
         }
+
+        drawHud(g);
 
         if (!player.isAlive()) {
             drawOverlay(g, "You died.\nLeft-click to restart.");
@@ -325,6 +398,22 @@ public final class Game extends JPanel {
 
         if (showOverlay) {
             drawOverlay(g, overlayMessage);
+        }
+    }
+
+    private void drawHud(Graphics g) {
+        g.setColor(Color.WHITE);
+        g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 16));
+        g.drawString("Kills: " + kills + "   Score: " + score, 10, 20);
+        g.drawString("Round " + round, 10, 40);
+        player.drawHealthBar(g, 10, 46, BAR_W, BAR_H);
+        player.drawArmorBar(g, 10, 66, BAR_W, BAR_H);
+        g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
+        g.drawString("Enemies: " + livingEnemyCount(), 10, 96);
+        g.drawString("Weapon: " + player.getWeapon().getName(), 10, 112);
+        g.drawString("Space to attack", 10, 128);
+        if (player.getWeapon().isRanged()) {
+            g.drawString("Aim with mouse", 10, 144);
         }
     }
 

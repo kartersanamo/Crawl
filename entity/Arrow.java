@@ -28,9 +28,9 @@ public final class Arrow {
         return active;
     }
 
-    public void update(double dt, Dungeon dungeon, List<Enemy> enemies) {
+    public HitResult update(double dt, Dungeon dungeon, List<Enemy> enemies) {
         if (!active) {
-            return;
+            return null;
         }
 
         x += vx * dt;
@@ -38,7 +38,7 @@ public final class Arrow {
 
         if (!dungeon.walkable((int) Math.floor(x), (int) Math.floor(y))) {
             active = false;
-            return;
+            return null;
         }
 
         for (Enemy enemy : enemies) {
@@ -46,11 +46,12 @@ public final class Arrow {
                 continue;
             }
             if (Math.hypot(enemy.getX() - x, enemy.getY() - y) < Enemy.RADIUS + RADIUS) {
-                enemy.takeDamage(damage);
+                int dealt = enemy.takeDamage(damage);
                 active = false;
-                return;
+                return dealt > 0 ? new HitResult(enemy, dealt) : null;
             }
         }
+        return null;
     }
 
     public void draw(Graphics g, double camX, double camY, int tileSize) {
@@ -61,5 +62,15 @@ public final class Arrow {
         int sy = (int) Math.round(y * tileSize - camY) - 2;
         g.setColor(new Color(220, 220, 100));
         g.fillOval(sx, sy, 5, 5);
+    }
+
+    public static final class HitResult {
+        public final Enemy enemy;
+        public final int damage;
+
+        HitResult(Enemy enemy, int damage) {
+            this.enemy = enemy;
+            this.damage = damage;
+        }
     }
 }

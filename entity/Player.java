@@ -118,21 +118,27 @@ public final class Player {
         return health > 0;
     }
 
-    public void takeDamage(int amount) {
+    /** @return total HP + armor lost */
+    public int takeDamage(int amount) {
         if (invulnTimer > 0 || !isAlive()) {
-            return;
+            return 0;
         }
 
+        int totalLost = 0;
         int remaining = amount;
         if (armor > 0) {
             int absorbed = Math.min(armor, remaining);
             armor -= absorbed;
             remaining -= absorbed;
+            totalLost += absorbed;
         }
         if (remaining > 0) {
-            health = Math.max(0, health - remaining);
+            int healthLost = Math.min(health, remaining);
+            health -= healthLost;
+            totalLost += healthLost;
         }
         invulnTimer = INVULN_SECONDS;
+        return totalLost;
     }
 
     public void tickTimers(double dt) {
