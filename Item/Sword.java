@@ -20,6 +20,6 @@ public final class Sword extends Weapon {
 
     @Override
     public int getMeleeDamage() {
-        return 3;
+        return 2;
     }
 }

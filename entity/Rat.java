@@ -4,7 +4,7 @@ import java.awt.Color;
 
 public final class Rat extends Enemy {
     public Rat(double x, double y) {
-        super(x, y, 1);
+        super(x, y, 2);
     }
 
     @Override

@@ -4,7 +4,7 @@ import java.awt.Color;
 
 public final class Slime extends Enemy {
     public Slime(double x, double y) {
-        super(x, y, 1);
+        super(x, y, 3);
     }
 
     @Override

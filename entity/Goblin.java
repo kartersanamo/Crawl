@@ -4,7 +4,7 @@ import java.awt.Color;
 
 public final class Goblin extends Enemy {
     public Goblin(double x, double y) {
-        super(x, y, 2);
+        super(x, y, 3);
     }
 
     @Override
