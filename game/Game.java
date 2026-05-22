@@ -62,12 +62,16 @@ public final class Game extends JPanel {
         setBackground(Color.BLACK);
         setFocusable(true);
 
-        loadRound();
+        loadRound(false);
 
         addKeyListener(new KeyAdapter() {
             public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_SPACE) {
-                    player.tryMeleeAttack(enemies);
+                    if (player.getWeapon().isRanged()) {
+                        fireBowAtMouse();
+                    } else {
+                        player.tryMeleeAttack(enemies);
+                    }
                     repaint();
                     return;
                 }
@@ -91,12 +95,7 @@ public final class Game extends JPanel {
                     }
                     if (showOverlay) {
                         round++;
-                        loadRound();
-                        repaint();
-                        return;
-                    }
-                    if (player.getWeapon().isRanged()) {
-                        fireBowAtMouse();
+                        loadRound(false);
                         repaint();
                     }
                 }
@@ -222,17 +221,21 @@ public final class Game extends JPanel {
 
     private void restartRun() {
         round = 1;
-        loadRound();
+        loadRound(true);
         repaint();
     }
 
-    private void loadRound() {
+    private void loadRound(boolean resetGear) {
         int w = Dungeon.DEFAULT_WIDTH + (round - 1) * MAP_GROWTH_PER_ROUND;
         int h = Dungeon.DEFAULT_HEIGHT + (round - 1) * MAP_GROWTH_PER_ROUND;
         long roundSeed = baseSeed + (long) round * 9973L;
         dungeon = Dungeon.generate(roundSeed, w, h);
         player.spawnAt(dungeon.spawnX, dungeon.spawnY);
-        player.revive();
+        if (resetGear) {
+            player.resetOnDeath();
+        } else {
+            player.revive();
+        }
         arrows.clear();
         Random rng = new Random(roundSeed ^ 0x5DEECE66DL);
         int[] exit = Dungeon.pickExitTile(dungeon, rng, dungeon.spawnX, dungeon.spawnY);
@@ -309,10 +312,9 @@ public final class Game extends JPanel {
         g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
         g.drawString("Enemies: " + livingEnemyCount(), 10, 78);
         g.drawString("Weapon: " + player.getWeapon().getName(), 10, 94);
+        g.drawString("Space to attack", 10, 110);
         if (player.getWeapon().isRanged()) {
-            g.drawString("Left-click to shoot", 10, 110);
-        } else {
-            g.drawString("Space to attack", 10, 110);
+            g.drawString("Aim with mouse", 10, 126);
         }
 
         if (!player.isAlive()) {

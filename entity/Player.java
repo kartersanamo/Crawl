@@ -54,12 +54,27 @@ public final class Player {
         potionTimer = 0;
     }
 
+    /** New floor: restore HP and clear armor/potions, keep equipped weapon. */
     public void revive() {
         health = MAX_HEALTH;
         armor = 0;
         invulnTimer = 0;
         speedMultiplier = 1.0;
         potionTimer = 0;
+    }
+
+    /** Death restart: back to fists, no armor, no active effects. */
+    public void resetOnDeath() {
+        health = MAX_HEALTH;
+        armor = 0;
+        invulnTimer = 0;
+        speedMultiplier = 1.0;
+        potionTimer = 0;
+        weapon = new Fists();
+        up = false;
+        down = false;
+        left = false;
+        right = false;
     }
 
     public int getHealth() {
