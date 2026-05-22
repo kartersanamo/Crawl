@@ -128,7 +128,7 @@ public final class Game extends JPanel {
     }
 
     private void fireBowAtMouse() {
-        if (!player.canAttack()) {
+        if (!player.canFireBow()) {
             return;
         }
         double camX = player.getX() * TILE - getWidth() / 2.0;
@@ -136,7 +136,7 @@ public final class Game extends JPanel {
         double targetX = (mouseScreenX + camX) / TILE;
         double targetY = (mouseScreenY + camY) / TILE;
         player.fireRanged(enemies, arrows, targetX, targetY);
-        player.triggerAttackCooldown();
+        player.triggerBowCooldown();
     }
 
     private void tick() {
@@ -190,10 +190,11 @@ public final class Game extends JPanel {
     }
 
     private void playerMeleeAttack() {
-        if (!player.canAttack()) {
+        if (!player.canMeleeAttack()) {
             return;
         }
         int damage = player.getWeapon().getMeleeDamage();
+        boolean hitSomething = false;
         for (Enemy enemy : enemies) {
             if (!enemy.isAlive()) {
                 continue;
@@ -203,10 +204,13 @@ public final class Game extends JPanel {
                 int dealt = enemy.takeDamage(damage);
                 if (dealt > 0) {
                     onEnemyHit(enemy, dealt);
+                    hitSomething = true;
                 }
             }
         }
-        player.triggerAttackCooldown();
+        if (hitSomething) {
+            player.triggerMeleeHitCooldown();
+        }
     }
 
     private void onEnemyHit(Enemy enemy, int damageDealt) {

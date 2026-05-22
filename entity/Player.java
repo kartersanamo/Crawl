@@ -18,14 +18,16 @@ public final class Player {
     public static final int MAX_ARMOR = 100;
     public static final double ATTACK_RANGE = 1.1;
     public static final double INVULN_SECONDS = 0.6;
-    public static final double ATTACK_COOLDOWN = 1.0;
+    public static final double MELEE_HIT_COOLDOWN = 1.0;
+    public static final double BOW_FIRE_COOLDOWN = 1.0;
 
     private double x;
     private double y;
     private int health = MAX_HEALTH;
     private int armor;
     private double invulnTimer;
-    private double attackCooldown;
+    private double meleeHitCooldown;
+    private double bowCooldown;
     private double speedMultiplier = 1.0;
     private double potionTimer;
     private Weapon weapon = new Fists();
@@ -63,12 +65,21 @@ public final class Player {
         potionTimer = 0;
     }
 
-    public boolean canAttack() {
-        return attackCooldown <= 0;
+    /** Melee can swing freely until a hit connects; then this blocks for 1s. */
+    public boolean canMeleeAttack() {
+        return meleeHitCooldown <= 0;
     }
 
-    public void triggerAttackCooldown() {
-        attackCooldown = ATTACK_COOLDOWN;
+    public void triggerMeleeHitCooldown() {
+        meleeHitCooldown = MELEE_HIT_COOLDOWN;
+    }
+
+    public boolean canFireBow() {
+        return bowCooldown <= 0;
+    }
+
+    public void triggerBowCooldown() {
+        bowCooldown = BOW_FIRE_COOLDOWN;
     }
 
     /** Death restart: back to fists, no armor, no active effects. */
@@ -76,7 +87,8 @@ public final class Player {
         health = MAX_HEALTH;
         armor = 0;
         invulnTimer = 0;
-        attackCooldown = 0;
+        meleeHitCooldown = 0;
+        bowCooldown = 0;
         speedMultiplier = 1.0;
         potionTimer = 0;
         weapon = new Fists();
@@ -154,8 +166,11 @@ public final class Player {
         if (invulnTimer > 0) {
             invulnTimer = Math.max(0, invulnTimer - dt);
         }
-        if (attackCooldown > 0) {
-            attackCooldown = Math.max(0, attackCooldown - dt);
+        if (meleeHitCooldown > 0) {
+            meleeHitCooldown = Math.max(0, meleeHitCooldown - dt);
+        }
+        if (bowCooldown > 0) {
+            bowCooldown = Math.max(0, bowCooldown - dt);
         }
         if (potionTimer > 0) {
             potionTimer = Math.max(0, potionTimer - dt);
