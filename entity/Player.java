@@ -9,11 +9,16 @@ import java.awt.event.KeyEvent;
 public final class Player {
     public static final double MOVE_SPEED = 10.0;
     public static final double RADIUS = 0.35;
-    public static final int SIZE = 14;
+    public static final int SIZE = 16;
     public static final Color COLOR = new Color(240, 210, 90);
+    public static final int MAX_HEALTH = 100;
+    public static final double ATTACK_RANGE = 1.1;
+    public static final double INVULN_SECONDS = 0.6;
 
     private double x;
     private double y;
+    private int health = MAX_HEALTH;
+    private double invulnTimer;
     private boolean up;
     private boolean down;
     private boolean left;
@@ -31,6 +36,52 @@ public final class Player {
     public void spawnAt(int tileX, int tileY) {
         x = tileX + 0.5;
         y = tileY + 0.5;
+    }
+
+    public void resetHealth() {
+        health = MAX_HEALTH;
+        invulnTimer = 0;
+    }
+
+    public int getHealth() {
+        return health;
+    }
+
+    public int getMaxHealth() {
+        return MAX_HEALTH;
+    }
+
+    public boolean isAlive() {
+        return health > 0;
+    }
+
+    public void takeDamage(int amount) {
+        if (invulnTimer > 0 || !isAlive()) {
+            return;
+        }
+        health = Math.max(0, health - amount);
+        invulnTimer = INVULN_SECONDS;
+    }
+
+    public void tickInvuln(double dt) {
+        if (invulnTimer > 0) {
+            invulnTimer = Math.max(0, invulnTimer - dt);
+        }
+    }
+
+    public boolean tryAttack(java.util.List<Enemy> enemies) {
+        boolean hit = false;
+        for (Enemy enemy : enemies) {
+            if (!enemy.isAlive()) {
+                continue;
+            }
+            double dist = Math.hypot(enemy.getX() - x, enemy.getY() - y);
+            if (dist <= ATTACK_RANGE + Enemy.RADIUS) {
+                enemy.takeDamage(1);
+                hit = true;
+            }
+        }
+        return hit;
     }
 
     public double getX() {
@@ -121,7 +172,19 @@ public final class Player {
     public void drawCentered(Graphics g, int panelWidth, int panelHeight) {
         int screenX = panelWidth / 2 - SIZE / 2;
         int screenY = panelHeight / 2 - SIZE / 2;
-        g.setColor(COLOR);
+        g.setColor(invulnTimer > 0 ? new Color(255, 180, 180) : COLOR);
         g.fillRect(screenX, screenY, SIZE, SIZE);
+    }
+
+    public void drawHealthBar(Graphics g, int x, int y, int width, int height) {
+        g.setColor(new Color(40, 40, 40));
+        g.fillRect(x, y, width, height);
+        int fill = (int) (width * (health / (double) MAX_HEALTH));
+        g.setColor(health > 30 ? new Color(60, 180, 80) : new Color(200, 50, 50));
+        g.fillRect(x, y, fill, height);
+        g.setColor(Color.WHITE);
+        g.drawRect(x, y, width, height);
+        g.setFont(new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 11));
+        g.drawString(health + " / " + MAX_HEALTH, x + 6, y + height - 5);
     }
 }
